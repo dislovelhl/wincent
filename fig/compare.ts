@@ -225,7 +225,24 @@ export default async function compare({
     }
     // TODO check mode etc...
   } else if (state === 'absent') {
-    throw new Error('"absent" state not yet implemented');
+    if (stats.type === 'file' || stats.type === 'link') {
+      diff.state = state;
+    } else if (stats.type === 'directory') {
+      if (force) {
+        diff.force = true;
+        diff.state = state;
+      } else {
+        diff.error = new ErrorWithMetadata(
+          `Cannot remove directory ${stringify(path)} without 'force'`,
+        );
+      }
+    } else {
+      diff.error = new ErrorWithMetadata(
+        `Cannot remove object ${stringify(path)} of unknown type`,
+      );
+    }
+
+    return diff;
   } else if (state === 'touch') {
     diff.state = 'touch';
   }
