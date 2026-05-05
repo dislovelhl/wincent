@@ -7,6 +7,8 @@
  */
 
 import * as assert from 'node:assert';
+import {mkdir, mkdtemp, symlink, writeFile} from 'node:fs/promises';
+import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {describe, test} from 'node:test';
 
@@ -93,6 +95,60 @@ describe('compare()', () => {
 
       assert.deepStrictEqual(diff, {
         path,
+      });
+    });
+
+    test('returns {state: "absent"} for existing files', async () => {
+      const directory = await mkdtemp(join(tmpdir(), 'fig-compare-'));
+      const path = join(directory, 'file');
+      await writeFile(path, 'contents');
+
+      const diff = await compare({path, state: 'absent'});
+
+      assert.deepStrictEqual(diff, {
+        path,
+        state: 'absent',
+      });
+    });
+
+    test('returns {state: "absent"} for existing symbolic links', async () => {
+      const directory = await mkdtemp(join(tmpdir(), 'fig-compare-'));
+      const target = join(directory, 'target');
+      const path = join(directory, 'link');
+      await writeFile(target, 'contents');
+      await symlink(target, path);
+
+      const diff = await compare({path, state: 'absent'});
+
+      assert.deepStrictEqual(diff, {
+        path,
+        state: 'absent',
+      });
+    });
+
+    test('complains about existing directories without force', async () => {
+      const path = await mkdtemp(join(tmpdir(), 'fig-compare-'));
+
+      const diff = await compare({path, state: 'absent'});
+
+      assert.deepStrictEqual(diff.path, path);
+      assert.match(
+        diff.error!.message,
+        /Cannot remove directory ".+" without 'force'/,
+      );
+    });
+
+    test('returns {force: true, state: "absent"} for existing directories with force', async () => {
+      const directory = await mkdtemp(join(tmpdir(), 'fig-compare-'));
+      const path = join(directory, 'directory');
+      await mkdir(path);
+
+      const diff = await compare({force: true, path, state: 'absent'});
+
+      assert.deepStrictEqual(diff, {
+        force: true,
+        path,
+        state: 'absent',
       });
     });
   });
